@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart To-Do List with Reminders</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: 2.5em;
+    }
+
+    .todo-container {
+      background: #ffffff10;
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      border-radius: 15px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    form input, form select, form button {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      border-radius: 10px;
+      border: none;
+      font-size: 1em;
+    }
+
+    form button {
+      background-color: #4caf50;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    form button:hover {
+      background-color: #45a049;
+    }
+
+    .task-list {
+      margin-top: 20px;
+      list-style: none;
+      padding: 0;
+    }
+
+    .task-item {
+      background: #ffffff15;
+      border-left: 6px solid #fff;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+      position: relative;
+      transition: background 0.3s;
+    }
+
+    .task-item.done {
+      background: #4caf50aa;
+      text-decoration: line-through;
+    }
+
+    .task-item p {
+      margin: 5px 0;
+    }
+
+    .task-item .actions {
+      margin-top: 5px;
+    }
+
+    .task-item button {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 0.9em;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+
+    .high { border-left-color: #e74c3c; }
+    .medium { border-left-color: #f1c40f; }
+    .low { border-left-color: #2ecc71; }
+
+    @media (max-width: 600px) {
+      .todo-container {
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📝 My Smart To-Do List</h1>
+
+  <div class="todo-container">
+    <form id="todo-form">
+      <input type="text" id="task-name" placeholder="Enter your task..." required />
+      <select id="task-category">
+        <option value="Personal">Personal</option>
+        <option value="Work">Work</option>
+        <option value="Study">Study</option>
+      </select>
+      <select id="task-priority">
+        <option value="low">Low Priority</option>
+        <option value="medium">Medium Priority</option>
+        <option value="high">High Priority</option>
+      </select>
+      <input type="datetime-local" id="task-deadline" />
+      <button type="submit">➕ Add Task</button>
+    </form>
+
+    <ul class="task-list" id="task-list">
+      <!-- Tasks appear here -->
+    </ul>
+  </div>
+
+  <!-- Notification sound -->
+  <audio id="reminder-sound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3" preload="auto"></audio>
+
+  <script>
+    const form = document.getElementById("todo-form");
+    const taskList = document.getElementById("task-list");
+    const reminderSound = document.getElementById("reminder-sound");
+
+    // Load tasks on page load
+    window.onload = () => {
+      const savedTasks = JSON.parse(localStorage.getItem("tasks")) || [];
+      savedTasks.forEach(task => createTaskElement(task, false));
+    };
+
+    // Ask notification permission
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const task = {
+        name: document.getElementById("task-name").value,
+        category: document.getElementById("task-category").value,
+        priority: document.getElementById("task-priority").value,
+        deadline: document.getElementById("task-deadline").value
+      };
+
+      createTaskElement(task, true);
+      form.reset();
+    });
+
+    function createTaskElement(task, saveToStorage = true) {
+      const li = document.createElement("li");
+      li.className = task-item ${task.priority};
+
+      li.innerHTML = `
+        <p><strong>${task.name}</strong></p>
+        <p>📂 Category: ${task.category}</p>
+        <p>⚡ Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}</p>
+        ${task.deadline ? <p>📅 Due: ${new Date(task.deadline).toLocaleString()}</p> : ""}
+        <div class="actions">
+          <button onclick="markDone(this)">✅ Done</button>
+          <button onclick="deleteTask(this)">🗑 Delete</button>
+        </div>
+      `;
+
+      taskList.appendChild(li);
+
+      // Schedule reminder
+      if (task.deadline) {
+        const delay = new Date(task.deadline).getTime() - Date.now();
+        if (delay > 0) {
+          setTimeout(() => {
+            if (Notification.permission === "granted") {
+              new Notification("⏰ Task Reminder", {
+                body: Don't forget: ${task.name},
+                icon: "https://cdn-icons-png.flaticon.com/512/2921/2921222.png"
+              });
+              reminderSound.play();
+            }
+          }, delay);
+        }
+      }
+
+      if (saveToStorage) {
+        saveTaskToLocal(task);
+      }
+    }
+
+    function markDone(btn) {
+      btn.closest(".task-item").classList.toggle("done");
+    }
+
+    function deleteTask(btn) {
+      const taskItem = btn.closest(".task-item");
+      const name = taskItem.querySelector("strong").innerText;
+      taskItem.remove();
+      removeTaskFromLocal(name);
+    }
+
+    function saveTaskToLocal(task) {
+      const tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+      tasks.push(task);
+      localStorage.setItem("tasks", JSON.stringify(tasks));
+    }
+
+    function removeTaskFromLocal(name) {
+      let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+      tasks = tasks.filter(t => t.name !== name);
+      localStorage.setItem("tasks", JSON.stringify(tasks));
+    }
+  </script>
+</body>
+</html>
